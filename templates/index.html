@@ -1117,13 +1117,13 @@
                         const topInteractions = document.getElementById('topInteractions');
 
                         // Sort connections by ETH received (top senders)
-                        const sortedBySent = [...data.analysis.connections]
-                            .sort((a, b) => b.sent - a.sent)
+                        const sortedByReceived = [...data.analysis.connections]
+                            .sort((a, b) => b.received - a.received)
                             .slice(0, 5);
 
                         // Sort connections by ETH sent (top receivers)
-                        const sortedByReceived = [...data.analysis.connections]
-                            .sort((a, b) => b.received - a.received)
+                        const sortedBySent = [...data.analysis.connections]
+                            .sort((a, b) => b.sent - a.sent)
                             .slice(0, 5);
 
                         // Sort connections by total transactions (most frequent)
@@ -1131,16 +1131,16 @@
                             .sort((a, b) => b.count - a.count)
                             .slice(0, 5);
 
-                        // Render top senders list
-                        topSenders.innerHTML = sortedBySent.map(conn => `
+                        // Render top senders list (addresses that sent ETH to us)
+                        topSenders.innerHTML = sortedByReceived.map(conn => `
                             <a href="https://etherscan.io/address/${conn.address}" 
                                class="interaction-item" 
                                target="_blank" 
                                rel="noopener noreferrer">
                                 <div class="interaction-address">${conn.address}</div>
                                 <div class="interaction-stats">
-                                    <span class="interaction-value" title="${formatUsd(conn.sent)}">
-                                        ${formatEth(conn.sent)}
+                                    <span class="interaction-value" title="${formatUsd(conn.received)}">
+                                        ${formatEth(conn.received)}
                                     </span>
                                     <span class="interaction-count">${conn.count} tx</span>
                                 </div>
@@ -1150,16 +1150,16 @@
                             </a>
                         `).join('');
 
-                        // Render top receivers list
-                        topReceivers.innerHTML = sortedByReceived.map(conn => `
+                        // Render top receivers list (addresses we sent ETH to)
+                        topReceivers.innerHTML = sortedBySent.map(conn => `
                             <a href="https://etherscan.io/address/${conn.address}" 
                                class="interaction-item" 
                                target="_blank" 
                                rel="noopener noreferrer">
                                 <div class="interaction-address">${conn.address}</div>
                                 <div class="interaction-stats">
-                                    <span class="interaction-value" title="${formatUsd(conn.received)}">
-                                        ${formatEth(conn.received)}
+                                    <span class="interaction-value" title="${formatUsd(conn.sent)}">
+                                        ${formatEth(conn.sent)}
                                     </span>
                                     <span class="interaction-count">${conn.count} tx</span>
                                 </div>
