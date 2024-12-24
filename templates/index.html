@@ -709,6 +709,152 @@
         .transaction-direction {
             color: var(--text-primary) !important;
         }
+
+        .saved-addresses {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .saved-addresses-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .saved-address-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            transition: var(--transition-normal);
+        }
+
+        .saved-address-item:hover {
+            background: var(--bg-hover);
+            transform: translateX(5px);
+        }
+
+        .saved-address-tag {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .saved-address-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .saved-address-actions button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: var(--transition-fast);
+        }
+
+        .saved-address-actions button:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .address-tag {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .address-tag:hover::after {
+            content: attr(data-address);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 0.5rem;
+        }
+
+        .tag-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .tag-modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .tag-input {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 0.75rem;
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            width: 100%;
+            margin: 1rem 0;
+        }
+
+        .tag-input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+            outline: none;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .modal-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition-fast);
+        }
+
+        .modal-btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .modal-btn-secondary {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
     </style>
 </head>
 <body>
@@ -835,6 +981,10 @@
                         <i class="bi bi-bar-chart"></i>
                         Statistics
                     </button>
+                    <button class="tab-btn" onclick="switchTab('saved')">
+                        <i class="bi bi-bookmark-star"></i>
+                        Saved Addresses
+                    </button>
                 </div>
 
                 <div id="networkTab" class="tab-content">
@@ -877,6 +1027,18 @@
                 <div id="statsTab" class="tab-content" style="display: none;">
                     <div id="visualization"></div>
                 </div>
+
+                <div id="savedTab" class="tab-content" style="display: none;">
+                    <div class="saved-addresses">
+                        <div class="saved-addresses-title">
+                            <h4>Saved Addresses</h4>
+                            <button class="modal-btn modal-btn-primary" onclick="addCurrentAddress()">
+                                <i class="bi bi-plus-lg"></i> Save Current
+                            </button>
+                        </div>
+                        <div id="savedAddressesList"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
@@ -888,6 +1050,17 @@
             </div>
             <h4 class="mt-4 mb-2">Analyzing Address</h4>
             <p class="text-muted" id="loadingProgress">Fetching transactions...</p>
+        </div>
+    </div>
+
+    <div class="tag-modal" id="tagModal">
+        <div class="tag-modal-content">
+            <h4>Add/Edit Tag</h4>
+            <input type="text" id="tagInput" class="tag-input" placeholder="Enter tag name (e.g., Dad's Wallet)">
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="closeTagModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="saveTag()">Save</button>
+            </div>
         </div>
     </div>
 
@@ -1260,13 +1433,14 @@
         });
 
         function createNetworkVisualization(data) {
+            window.lastAnalysisData = data;  // Store for later recreation
             const container = document.getElementById('network');
             container.innerHTML = '';
             
             const nodes = [{
                 id: data.address,
-                label: data.address.slice(0, 8) + '...',
-                title: `Main Address: ${data.address}\nTotal Transactions: ${data.total_transactions}`,
+                label: getNodeLabel(data.address),
+                title: getNodeTitle(data.address, `\nTotal Transactions: ${data.total_transactions}`),
                 color: {
                     background: '#7c3aed',
                     border: '#a78bfa',
@@ -1297,14 +1471,13 @@
             }];
             
             const edges = [];
-            const addedNodes = new Set([data.address]); // Track added nodes
+            const addedNodes = new Set([data.address]);
             
             const maxValue = Math.max(
                 ...data.connections.map(conn => Math.max(conn.sent, conn.received))
             );
             
             data.connections.forEach(conn => {
-                // Skip if we've already added this node
                 if (addedNodes.has(conn.address)) {
                     return;
                 }
@@ -1314,8 +1487,8 @@
                 
                 nodes.push({
                     id: conn.address,
-                    label: conn.address.slice(0, 8) + '...',
-                    title: `Address: ${conn.address}\nSent: ${formatEth(conn.sent)}\nReceived: ${formatEth(conn.received)}\nTransactions: ${conn.count}`,
+                    label: getNodeLabel(conn.address),
+                    title: getNodeTitle(conn.address, `\nSent: ${formatEth(conn.sent)}\nReceived: ${formatEth(conn.received)}\nTransactions: ${conn.count}`),
                     color: {
                         background: '#4f46e5',
                         border: '#818cf8',
@@ -1345,7 +1518,7 @@
                     }
                 });
                 
-                addedNodes.add(conn.address); // Mark this node as added
+                addedNodes.add(conn.address);
                 
                 edges.push({
                     from: data.address,
@@ -1455,6 +1628,7 @@
         }
 
         function createStatisticsVisualization(data) {
+            window.lastAnalysisData = data.analysis;  // Store for later recreation
             const statsContainer = document.getElementById('visualization');
             statsContainer.innerHTML = `
                 <div class="stats-container">
@@ -1475,7 +1649,7 @@
                 </div>
             `;
 
-            // ETH Flow Chart
+            // ETH Flow Chart with tags
             const ethFlowOptions = {
                 series: [{
                     name: 'Transaction Volume',
@@ -1483,7 +1657,7 @@
                         .sort((a, b) => (b.sent + b.received) - (a.sent + a.received))
                         .slice(0, 10)
                         .map(conn => ({
-                            x: conn.address.slice(0, 10) + '...',
+                            x: getNodeLabel(conn.address),
                             y: parseFloat(conn.sent + conn.received)
                         }))
                 }],
@@ -1659,6 +1833,149 @@
                     currency: 'USD'
                 }).format(usdValue);
         }
+
+        let addressTags = JSON.parse(localStorage.getItem('addressTags') || '{}');
+        let currentTagAddress = '';
+
+        function showTagModal(address) {
+            currentTagAddress = address;
+            const modal = document.getElementById('tagModal');
+            const input = document.getElementById('tagInput');
+            input.value = addressTags[address] || '';
+            modal.style.display = 'flex';
+            input.focus();
+        }
+
+        function closeTagModal() {
+            document.getElementById('tagModal').style.display = 'none';
+            currentTagAddress = '';
+        }
+
+        function saveTag() {
+            const tag = document.getElementById('tagInput').value.trim();
+            if (tag && currentTagAddress) {
+                addressTags[currentTagAddress] = tag;
+                localStorage.setItem('addressTags', JSON.stringify(addressTags));
+                updateSavedAddresses();
+                updateAddressTags();
+            }
+            closeTagModal();
+        }
+
+        function addCurrentAddress() {
+            const address = document.getElementById('addressInput').value.trim();
+            if (address) {
+                showTagModal(address);
+            }
+        }
+
+        function removeTag(address) {
+            delete addressTags[address];
+            localStorage.setItem('addressTags', JSON.stringify(addressTags));
+            updateSavedAddresses();
+            updateAddressTags();
+        }
+
+        function updateSavedAddresses() {
+            const container = document.getElementById('savedAddressesList');
+            container.innerHTML = Object.entries(addressTags).map(([address, tag]) => `
+                <div class="saved-address-item">
+                    <div class="saved-address-tag">${tag}</div>
+                    <div class="saved-address-actions">
+                        <button onclick="analyzeNewAddress('${address}')" title="Analyze">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        <button onclick="copyAddress('${address}')" title="Copy Address">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                        <button onclick="showTagModal('${address}')" title="Edit Tag">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button onclick="removeTag('${address}')" title="Remove">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function copyAddress(address) {
+            navigator.clipboard.writeText(address).then(() => {
+                alert('Address copied to clipboard!');
+            });
+        }
+
+        function getAddressDisplay(address) {
+            const tag = addressTags[address];
+            if (tag) {
+                return `<span class="address-tag" data-address="${address}" onclick="copyAddress('${address}')">${tag}</span>`;
+            }
+            return address.slice(0, 10) + '...';
+        }
+
+        function getNodeLabel(address) {
+            const tag = addressTags[address];
+            return tag || address.slice(0, 8) + '...';
+        }
+
+        function getNodeTitle(address, extraInfo = '') {
+            const tag = addressTags[address];
+            return `${tag ? `Tag: ${tag}\n` : ''}Address: ${address}${extraInfo}`;
+        }
+
+        function updateAddressTags() {
+            // Update recent transactions
+            const transactions = document.querySelectorAll('.transaction-item');
+            transactions.forEach(tx => {
+                const addressSpan = tx.querySelector('.connection-address');
+                if (addressSpan) {
+                    const address = addressSpan.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if (addressTags[address]) {
+                        addressSpan.innerHTML = getAddressDisplay(address);
+                    }
+                }
+            });
+
+            // Update top interactions
+            const interactions = document.querySelectorAll('.interaction-address');
+            interactions.forEach(interaction => {
+                const address = interaction.textContent;
+                if (addressTags[address]) {
+                    interaction.innerHTML = getAddressDisplay(address);
+                }
+            });
+
+            // Update network graph if it exists
+            const network = document.getElementById('network');
+            if (network && network.firstChild) {
+                createNetworkVisualization({
+                    address: document.getElementById('addressInput').value.trim(),
+                    total_transactions: window.lastAnalysisData?.total_transactions,
+                    connections: window.lastAnalysisData?.connections || []
+                });
+            }
+
+            // Update statistics charts if they exist
+            const ethFlowChart = document.getElementById('ethFlowChart');
+            if (ethFlowChart && window.lastAnalysisData) {
+                createStatisticsVisualization({ analysis: window.lastAnalysisData });
+            }
+        }
+
+        // Update saved addresses on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateSavedAddresses();
+            // ... existing DOMContentLoaded code ...
+        });
+
+        // Modify analyzeAddress function to update tags after loading data
+        const originalAnalyzeAddress = analyzeAddress;
+        analyzeAddress = function(skipPushState = false) {
+            originalAnalyzeAddress.call(this, skipPushState);
+            setTimeout(() => {
+                updateAddressTags();
+            }, 1000);
+        };
     </script>
 </body>
 </html> 
