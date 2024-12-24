@@ -1299,8 +1299,9 @@
                                                 ${isSent ? 'To:' : 'From:'} 
                                                 <span class="connection-address" 
                                                       onclick="analyzeNewAddress('${isSent ? tx.to : tx.from}')"
+                                                      data-address="${isSent ? tx.to : tx.from}"
                                                       style="cursor: pointer;">
-                                                    ${(isSent ? tx.to : tx.from).slice(0, 10)}...
+                                                    ${getAddressDisplay(isSent ? tx.to : tx.from)}
                                                 </span>
                                             </div>
                                         </div>
@@ -1335,7 +1336,9 @@
                                class="interaction-item" 
                                target="_blank" 
                                rel="noopener noreferrer">
-                                <div class="interaction-address">${conn.address}</div>
+                                <div class="interaction-address" data-address="${conn.address}">
+                                    ${getAddressDisplay(conn.address)}
+                                </div>
                                 <div class="interaction-stats">
                                     <span class="interaction-value" title="${formatUsd(conn.received)}">
                                         ${formatEth(conn.received)}
@@ -1354,7 +1357,9 @@
                                class="interaction-item" 
                                target="_blank" 
                                rel="noopener noreferrer">
-                                <div class="interaction-address">${conn.address}</div>
+                                <div class="interaction-address" data-address="${conn.address}">
+                                    ${getAddressDisplay(conn.address)}
+                                </div>
                                 <div class="interaction-stats">
                                     <span class="interaction-value" title="${formatUsd(conn.sent)}">
                                         ${formatEth(conn.sent)}
@@ -1378,7 +1383,9 @@
                                class="interaction-item" 
                                target="_blank" 
                                rel="noopener noreferrer">
-                                <div class="interaction-address">${conn.address}</div>
+                                <div class="interaction-address" data-address="${conn.address}">
+                                    ${getAddressDisplay(conn.address)}
+                                </div>
                                 <div class="interaction-stats">
                                     <span class="interaction-value">
                                         <span class="text-danger" title="${formatUsd(conn.sent)}">↑ ${formatEth(conn.sent)}</span>
@@ -1957,20 +1964,23 @@
         }
 
         function getAddressDisplay(address) {
-            const tag = addressTags[address.toLowerCase()];
+            const lowerAddress = address.toLowerCase();
+            const tag = addressTags[lowerAddress];
             if (tag) {
-                return `<span class="address-tag" data-address="${address}" onclick="copyAddress('${address}')">${tag}</span>`;
+                return `<span class="address-tag" data-address="${address}" onclick="event.stopPropagation(); copyAddress('${address}')">${tag}</span>`;
             }
             return address.slice(0, 10) + '...';
         }
 
         function getNodeLabel(address) {
-            const tag = addressTags[address.toLowerCase()];
+            const lowerAddress = address.toLowerCase();
+            const tag = addressTags[lowerAddress];
             return tag || address.slice(0, 8) + '...';
         }
 
         function getNodeTitle(address, extraInfo = '') {
-            const tag = addressTags[address.toLowerCase()];
+            const lowerAddress = address.toLowerCase();
+            const tag = addressTags[lowerAddress];
             return `${tag ? `Tag: ${tag}\n` : ''}Address: ${address}${extraInfo}`;
         }
 
@@ -1980,9 +1990,8 @@
             transactions.forEach(tx => {
                 const addressSpan = tx.querySelector('.connection-address');
                 if (addressSpan) {
-                    const address = addressSpan.getAttribute('onclick').match(/'([^']+)'/)[1];
-                    const tag = addressTags[address.toLowerCase()];
-                    if (tag) {
+                    const address = addressSpan.getAttribute('data-address');
+                    if (address) {
                         addressSpan.innerHTML = getAddressDisplay(address);
                     }
                 }
@@ -1991,16 +2000,15 @@
             // Update top interactions
             const interactions = document.querySelectorAll('.interaction-address');
             interactions.forEach(interaction => {
-                const address = interaction.textContent;
-                const tag = addressTags[address.toLowerCase()];
-                if (tag) {
+                const address = interaction.getAttribute('data-address');
+                if (address) {
                     interaction.innerHTML = getAddressDisplay(address);
                 }
             });
 
-            // Update most frequent interactions
+            // Update most frequent interactions only if we have data
             const topInteractions = document.getElementById('topInteractions');
-            if (topInteractions && window.lastAnalysisData) {
+            if (topInteractions && window.lastAnalysisData && window.lastAnalysisData.connections) {
                 const sortedByCount = [...window.lastAnalysisData.connections]
                     .sort((a, b) => b.count - a.count)
                     .slice(0, 5);
@@ -2014,7 +2022,9 @@
                        class="interaction-item" 
                        target="_blank" 
                        rel="noopener noreferrer">
-                        <div class="interaction-address">${getAddressDisplay(conn.address)}</div>
+                        <div class="interaction-address" data-address="${conn.address}">
+                            ${getAddressDisplay(conn.address)}
+                        </div>
                         <div class="interaction-stats">
                             <span class="interaction-value">
                                 <span class="text-danger" title="${formatUsd(conn.sent)}">↑ ${formatEth(conn.sent)}</span>
@@ -2036,34 +2046,62 @@
                 `}).join('');
             }
 
-            // Update network graph if it exists
+            // Update network graph only if we have data and the network exists
             const network = document.getElementById('network');
-            if (network && network.firstChild) {
+            if (network && network.firstChild && window.lastAnalysisData && 
+                window.lastAnalysisData.total_transactions && window.lastAnalysisData.connections) {
                 createNetworkVisualization({
                     address: document.getElementById('addressInput').value.trim(),
-                    total_transactions: window.lastAnalysisData?.total_transactions,
-                    connections: window.lastAnalysisData?.connections || []
+                    total_transactions: window.lastAnalysisData.total_transactions,
+                    connections: window.lastAnalysisData.connections
                 });
             }
 
-            // Update statistics charts if they exist
+            // Update statistics charts only if we have data and the chart exists
             const ethFlowChart = document.getElementById('ethFlowChart');
-            if (ethFlowChart && window.lastAnalysisData) {
+            if (ethFlowChart && window.lastAnalysisData && 
+                window.lastAnalysisData.total_transactions && window.lastAnalysisData.connections) {
                 createStatisticsVisualization({ analysis: window.lastAnalysisData });
             }
         }
 
         // Update saved addresses on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Load address tags from localStorage
+            addressTags = JSON.parse(localStorage.getItem('addressTags') || '{}');
+            
+            // Update saved addresses list
             updateSavedAddresses();
-            // ... existing DOMContentLoaded code ...
+            
+            // Check API key
+            checkApiKey();
+            
+            // Check URL for address parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const address = urlParams.get('address');
+            if (address && apiKey) {
+                document.getElementById('addressInput').value = address;
+                // Check for tag of the current address
+                checkMainAddressTag();
+                analyzeAddress();
+            }
+            
+            // Update ETH price
+            updateEthPrice();
+            
+            // Update all address tags in the interface
+            setTimeout(() => {
+                updateAddressTags();
+            }, 1000);
         });
 
-        // Modify analyzeAddress function to update tags after loading data
+        // Remove the old analyzeAddress modification and create a new one
         const originalAnalyzeAddress = analyzeAddress;
         analyzeAddress = function(skipPushState = false) {
             originalAnalyzeAddress.call(this, skipPushState);
+            // Update tags after analysis is complete
             setTimeout(() => {
+                checkMainAddressTag();
                 updateAddressTags();
             }, 1000);
         };
