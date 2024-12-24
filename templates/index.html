@@ -652,6 +652,63 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        .converter-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .converter-title {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .converter-input {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem 0 0 0.75rem;
+            font-family: 'Space Grotesk', monospace;
+        }
+
+        .converter-input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+            outline: none;
+        }
+
+        .converter-symbol {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-left: none;
+            color: var(--text-secondary);
+            padding: 0.75rem 1rem;
+            border-radius: 0 0.75rem 0.75rem 0;
+            font-family: 'Space Grotesk', monospace;
+        }
+
+        .converter-result {
+            color: var(--text-primary);
+            font-family: 'Space Grotesk', monospace;
+            font-size: 1.25rem;
+            font-weight: 500;
+        }
+
+        .transaction-date {
+            color: var(--text-primary) !important;
+        }
+
+        .transaction-direction {
+            color: var(--text-primary) !important;
+        }
     </style>
 </head>
 <body>
@@ -679,6 +736,22 @@
                                 <i class="bi bi-search"></i>
                                 Analyze
                             </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-4">
+                    <div class="col-md-8 mx-auto">
+                        <div class="converter-box">
+                            <div class="converter-title">ETH/USD Converter</div>
+                            <div class="input-group">
+                                <input type="number" id="ethAmount" class="form-control converter-input" 
+                                       placeholder="Enter ETH amount" step="0.0001" min="0"
+                                       oninput="convertEthToUsd()">
+                                <span class="input-group-text converter-symbol">ETH</span>
+                            </div>
+                            <div class="converter-result mt-2" id="usdResult">
+                                ≈ $0.00
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -962,7 +1035,7 @@
                         // Update statistics
                         const totalSent = analysis.total_eth_sent;
                         const totalReceived = analysis.total_eth_received;
-                        const netPosition = totalReceived - totalSent;
+                        const netPosition = analysis.net_position;
 
                         document.getElementById('totalSent').textContent = formatEth(totalSent);
                         document.getElementById('totalSentUsd').textContent = formatUsd(totalSent);
@@ -1014,17 +1087,17 @@
                                                 <div class="transaction-hash">
                                                     ${tx.hash}
                                                 </div>
+                                                <div class="text-muted small transaction-date">
+                                                    ${formattedTime}
+                                                </div>
                                             </a>
-                                            <div class="text-muted small">
-                                                ${formattedTime}
-                                            </div>
                                         </div>
                                         <div class="text-end">
                                             <div class="stat-value ${isSent ? 'negative-change' : 'positive-change'}" 
                                                  title="${formatUsd(value)}">
                                                 ${formatEth(value)}
                                             </div>
-                                            <div class="small text-muted">
+                                            <div class="small transaction-direction">
                                                 ${isSent ? 'To:' : 'From:'} 
                                                 <span class="connection-address" 
                                                       onclick="analyzeNewAddress('${isSent ? tx.to : tx.from}')"
@@ -1224,12 +1297,18 @@
             }];
             
             const edges = [];
+            const addedNodes = new Set([data.address]); // Track added nodes
             
             const maxValue = Math.max(
                 ...data.connections.map(conn => Math.max(conn.sent, conn.received))
             );
             
             data.connections.forEach(conn => {
+                // Skip if we've already added this node
+                if (addedNodes.has(conn.address)) {
+                    return;
+                }
+                
                 const totalValue = conn.sent + conn.received;
                 const size = 25 + (totalValue / maxValue) * 35;
                 
@@ -1265,6 +1344,8 @@
                         y: 0
                     }
                 });
+                
+                addedNodes.add(conn.address); // Mark this node as added
                 
                 edges.push({
                     from: data.address,
@@ -1567,6 +1648,16 @@
             } catch (e) {
                 return 'No date available';
             }
+        }
+
+        function convertEthToUsd() {
+            const ethAmount = parseFloat(document.getElementById('ethAmount').value) || 0;
+            const usdValue = ethAmount * currentEthPrice;
+            document.getElementById('usdResult').textContent = 
+                '≈ ' + new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD'
+                }).format(usdValue);
         }
     </script>
 </body>

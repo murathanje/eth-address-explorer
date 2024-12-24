@@ -38,6 +38,17 @@ class EtherscanService {
             internal_summary: { total_eth_in: 0, total_eth_out: 0, total_transactions: 0 }
         };
 
+        // Fetch current balance
+        try {
+            const balanceResponse = await axios.get(`${this.ETHERSCAN_API_URL}?module=account&action=balance&address=${address}&tag=latest&apikey=${apiKey}`);
+            if (balanceResponse.data.status === '1') {
+                result.current_balance = parseFloat(balanceResponse.data.result) / 1e18;
+            }
+        } catch (error) {
+            console.error('Error fetching balance:', error);
+            result.current_balance = 0;
+        }
+
         // Fetch normal transactions
         await this.fetchPaginatedTransactions(
             address, 
@@ -144,6 +155,7 @@ class EtherscanService {
             connections: connectionsList,
             total_eth_sent: totalEthOut,
             total_eth_received: totalEthIn,
+            net_position: txData.current_balance || 0,
             total_transactions: totalTransactions,
             normal_summary: txData.normal_summary,
             internal_summary: txData.internal_summary,
