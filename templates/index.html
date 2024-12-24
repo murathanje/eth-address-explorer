@@ -1945,6 +1945,44 @@
                 }
             });
 
+            // Update most frequent interactions
+            const topInteractions = document.getElementById('topInteractions');
+            if (topInteractions && window.lastAnalysisData) {
+                const sortedByCount = [...window.lastAnalysisData.connections]
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 5);
+
+                topInteractions.innerHTML = sortedByCount.map(conn => {
+                    const dates = conn.dates || [];
+                    const sortedDates = dates.sort((a, b) => b - a).slice(0, 5);
+                    
+                    return `
+                    <a href="https://etherscan.io/address/${conn.address}" 
+                       class="interaction-item" 
+                       target="_blank" 
+                       rel="noopener noreferrer">
+                        <div class="interaction-address">${getAddressDisplay(conn.address)}</div>
+                        <div class="interaction-stats">
+                            <span class="interaction-value">
+                                <span class="text-danger" title="${formatUsd(conn.sent)}">↑ ${formatEth(conn.sent)}</span>
+                                <span class="text-success" title="${formatUsd(conn.received)}">↓ ${formatEth(conn.received)}</span>
+                            </span>
+                            <span class="interaction-count">${conn.count} tx</span>
+                        </div>
+                        <div class="interaction-dates">
+                            <div>Last 5 interactions:</div>
+                            <div class="interaction-date-list">
+                                ${sortedDates.map(date => `
+                                    <div class="interaction-date-item">
+                                        ${formatDate(date)}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </a>
+                `}).join('');
+            }
+
             // Update network graph if it exists
             const network = document.getElementById('network');
             if (network && network.firstChild) {
