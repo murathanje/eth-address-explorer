@@ -855,6 +855,23 @@
             background: var(--bg-hover);
             color: var(--text-primary);
         }
+
+        .tag-input-group {
+            margin-bottom: 1rem;
+        }
+
+        .tag-input-group label {
+            display: block;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .saved-addresses-title button {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -1032,8 +1049,8 @@
                     <div class="saved-addresses">
                         <div class="saved-addresses-title">
                             <h4>Saved Addresses</h4>
-                            <button class="modal-btn modal-btn-primary" onclick="addCurrentAddress()">
-                                <i class="bi bi-plus-lg"></i> Save Current
+                            <button class="modal-btn modal-btn-primary" onclick="showTagModal()">
+                                <i class="bi bi-plus-lg"></i> Add New
                             </button>
                         </div>
                         <div id="savedAddressesList"></div>
@@ -1056,7 +1073,14 @@
     <div class="tag-modal" id="tagModal">
         <div class="tag-modal-content">
             <h4>Add/Edit Tag</h4>
-            <input type="text" id="tagInput" class="tag-input" placeholder="Enter tag name (e.g., Dad's Wallet)">
+            <div class="tag-input-group">
+                <label>Address</label>
+                <input type="text" id="addressTagInput" class="tag-input" placeholder="Enter Ethereum address (0x...)">
+            </div>
+            <div class="tag-input-group">
+                <label>Tag Name</label>
+                <input type="text" id="tagInput" class="tag-input" placeholder="Enter tag name (e.g., Dad's Wallet)">
+            </div>
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-secondary" onclick="closeTagModal()">Cancel</button>
                 <button class="modal-btn modal-btn-primary" onclick="saveTag()">Save</button>
@@ -1837,43 +1861,69 @@
         let addressTags = JSON.parse(localStorage.getItem('addressTags') || '{}');
         let currentTagAddress = '';
 
-        function showTagModal(address) {
-            currentTagAddress = address;
+        function showTagModal(address = '') {
             const modal = document.getElementById('tagModal');
-            const input = document.getElementById('tagInput');
-            input.value = addressTags[address] || '';
+            const addressInput = document.getElementById('addressTagInput');
+            const tagInput = document.getElementById('tagInput');
+            
+            if (address) {
+                const lowerAddress = address.toLowerCase();
+                addressInput.value = address;
+                tagInput.value = addressTags[lowerAddress] || '';
+                addressInput.readOnly = true;  // Make address input readonly when editing
+            } else {
+                addressInput.value = '';
+                tagInput.value = '';
+                addressInput.readOnly = false;  // Allow address input when adding new
+            }
+            
             modal.style.display = 'flex';
-            input.focus();
+            addressInput.focus();  // Focus on address input for new entries
         }
 
         function closeTagModal() {
-            document.getElementById('tagModal').style.display = 'none';
-            currentTagAddress = '';
+            const modal = document.getElementById('tagModal');
+            modal.style.display = 'none';
+            // Clear inputs
+            document.getElementById('addressTagInput').value = '';
+            document.getElementById('tagInput').value = '';
         }
 
         function saveTag() {
+            const address = document.getElementById('addressTagInput').value.trim();
             const tag = document.getElementById('tagInput').value.trim();
-            if (tag && currentTagAddress) {
-                addressTags[currentTagAddress] = tag;
+            
+            if (!address.match(/^0x[a-fA-F0-9]{40}$/)) {
+                alert('Please enter a valid Ethereum address');
+                return;
+            }
+            
+            if (!tag) {
+                alert('Please enter a tag name');
+                return;
+            }
+
+            const lowerAddress = address.toLowerCase();
+            addressTags[lowerAddress] = tag;
+            localStorage.setItem('addressTags', JSON.stringify(addressTags));
+            updateSavedAddresses();
+            updateAddressTags();
+            
+            // Close the modal after saving
+            const modal = document.getElementById('tagModal');
+            modal.style.display = 'none';
+            document.getElementById('addressTagInput').value = '';
+            document.getElementById('tagInput').value = '';
+        }
+
+        function removeTag(address) {
+            const lowerAddress = address.toLowerCase();
+            if (addressTags[lowerAddress]) {
+                delete addressTags[lowerAddress];
                 localStorage.setItem('addressTags', JSON.stringify(addressTags));
                 updateSavedAddresses();
                 updateAddressTags();
             }
-            closeTagModal();
-        }
-
-        function addCurrentAddress() {
-            const address = document.getElementById('addressInput').value.trim();
-            if (address) {
-                showTagModal(address);
-            }
-        }
-
-        function removeTag(address) {
-            delete addressTags[address];
-            localStorage.setItem('addressTags', JSON.stringify(addressTags));
-            updateSavedAddresses();
-            updateAddressTags();
         }
 
         function updateSavedAddresses() {
@@ -1906,7 +1956,7 @@
         }
 
         function getAddressDisplay(address) {
-            const tag = addressTags[address];
+            const tag = addressTags[address.toLowerCase()];
             if (tag) {
                 return `<span class="address-tag" data-address="${address}" onclick="copyAddress('${address}')">${tag}</span>`;
             }
@@ -1914,12 +1964,12 @@
         }
 
         function getNodeLabel(address) {
-            const tag = addressTags[address];
+            const tag = addressTags[address.toLowerCase()];
             return tag || address.slice(0, 8) + '...';
         }
 
         function getNodeTitle(address, extraInfo = '') {
-            const tag = addressTags[address];
+            const tag = addressTags[address.toLowerCase()];
             return `${tag ? `Tag: ${tag}\n` : ''}Address: ${address}${extraInfo}`;
         }
 
@@ -1930,7 +1980,8 @@
                 const addressSpan = tx.querySelector('.connection-address');
                 if (addressSpan) {
                     const address = addressSpan.getAttribute('onclick').match(/'([^']+)'/)[1];
-                    if (addressTags[address]) {
+                    const tag = addressTags[address.toLowerCase()];
+                    if (tag) {
                         addressSpan.innerHTML = getAddressDisplay(address);
                     }
                 }
@@ -1940,7 +1991,8 @@
             const interactions = document.querySelectorAll('.interaction-address');
             interactions.forEach(interaction => {
                 const address = interaction.textContent;
-                if (addressTags[address]) {
+                const tag = addressTags[address.toLowerCase()];
+                if (tag) {
                     interaction.innerHTML = getAddressDisplay(address);
                 }
             });
